@@ -218,7 +218,9 @@ mod tests {
             Token::Int(10),
             Token::NotEqual,
             Token::Int(9),
-            Token::Semicolon
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Eof
         ];
 
         let mut l = Lexer::new(input);

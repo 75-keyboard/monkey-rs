@@ -1,5 +1,7 @@
 pub mod lexer;
+pub mod ast;
 pub mod token;
+pub mod parser;
 
 use lexer::Lexer;
 use std::io::{self};
