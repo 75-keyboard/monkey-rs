@@ -2,10 +2,16 @@ use crate::ast;
 use crate::token::Token;
 use crate::lexer::Lexer;
 
+#[derive(Debug, Clone)]
+pub struct ParseError {
+    msg: String
+}
+
 pub struct Parser<'a> {
     l: Lexer<'a>,
     cur_token: Token,
-    peek_token: Token
+    peek_token: Token,
+    errors: Vec<String>
 }
 
 impl<'a> Parser<'a> {
@@ -14,7 +20,8 @@ impl<'a> Parser<'a> {
         Parser {
             l: l,
             cur_token: tok.0,
-            peek_token: tok.1
+            peek_token: tok.1,
+            errors: Vec::new()
         }
     }
 
@@ -49,7 +56,10 @@ impl<'a> Parser<'a> {
             Token::Ident(x) => {
                 ast::Expression::Identifier(Token::Ident(x))
             },
-            _ => return None
+            _ => { 
+                self.cur_error(Token::Ident("SOMETHING".to_string())); 
+                return None;
+            }
             
         };
         
@@ -73,11 +83,23 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_peek(&mut self, t: Token) -> bool {
-        if self.peek_token_is(t) {
+        if self.peek_token_is(t.clone()) {
             self.next_token(); true
         } else {
-            false
+            self.peek_error(t); false
         }
+    }
+
+    pub fn errors(&self) -> Vec<String> {
+        self.errors.clone()
+    }
+
+    fn cur_error(&mut self, t: Token) {
+        self.errors.push(format!("expected next token to be {:?}, got {:?} instead", t, self.cur_token));
+    }
+
+    fn peek_error(&mut self, t: Token) {
+        self.errors.push(format!("expected next token to be {:?}, got {:?} instead", t, self.peek_token));
     }
 }
 
@@ -88,17 +110,31 @@ mod tests {
     use crate::parser::Parser;
     use crate::ast;
 
+    fn check_parser_errors(p: &mut Parser) {
+        let errors = p.errors();
+        if errors.len() == 0 {
+            return;
+        }
+
+        println!("parser has {} errors", errors.len());
+        for msg in errors {
+            println!("parser error: {}", msg);
+        }
+        panic!("paniced");
+    }
+
     #[test]
     fn test_let_statements() {
         let input = r#"
-let x = 5;
-let y = 10;
-let foobar = 838383;
+let x  5;
+let  = 10;
+let 838383;
         "#;
         let l = Lexer::new(input);
         let mut p = Parser::new(l);
 
         let program = p.parse_program();
+        check_parser_errors(&mut p);
 
         assert_eq!(program.len(), 3);
         
