@@ -25,10 +25,11 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> ast::Program {
         let mut program = ast::Program::new();
-        while self.cur_token != Token::Eof {
+        while !self.cur_token_is(Token::Eof) {
             if let Some(x) = self.parse_statement() {
                 program.push(x);
             }
+            self.next_token();
         }
         program
     }
@@ -52,14 +53,12 @@ impl<'a> Parser<'a> {
             
         };
         
-        if let Token::Assign = self.peek_token { self.next_token() } else { return None }
+        if !self.expect_peek(Token::Assign) {
+            return None;
+        }
 
-        loop {
-            if let Token::Semicolon = self.cur_token { 
-                self.next_token(); break; 
-            } else { 
-                self.next_token();
-            }
+        while !self.cur_token_is(Token::Semicolon) {
+            self.next_token();
         }
         
         Some(ast::Statement::LetStatement{ token: ct, name: n.clone(), value: n})
@@ -75,8 +74,7 @@ impl<'a> Parser<'a> {
 
     fn expect_peek(&mut self, t: Token) -> bool {
         if self.peek_token_is(t) {
-            self.next_token();
-            true
+            self.next_token(); true
         } else {
             false
         }
