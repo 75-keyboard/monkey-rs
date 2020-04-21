@@ -44,6 +44,7 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> Option<ast::Statement> {
         match self.cur_token {
             Token::Let => return self.parse_let_statement(),
+            Token::Return => return self.parse_return_statement(),
             _ => None,
         }
     }
@@ -72,6 +73,17 @@ impl<'a> Parser<'a> {
         }
         
         Some(ast::Statement::LetStatement{ token: ct, name: n.clone(), value: n})
+    }
+    
+    fn parse_return_statement(&mut self) -> Option<ast::Statement> {
+        let ct = self.cur_token.clone();
+        self.next_token();
+
+        while !self.cur_token_is(Token::Semicolon) {
+            self.next_token();
+        }
+
+        Some(ast::Statement::ReturnStatement{ token: ct, value: ast::Expression::Identifier(Token::Semicolon)})
     }
 
     fn cur_token_is(&self, t: Token) -> bool {
@@ -126,9 +138,9 @@ mod tests {
     #[test]
     fn test_let_statements() {
         let input = r#"
-let x  5;
-let  = 10;
-let 838383;
+let x = 5;
+let y = 10;
+let foobar = 838383;
         "#;
         let l = Lexer::new(input);
         let mut p = Parser::new(l);
@@ -150,6 +162,30 @@ let 838383;
                     assert_eq!(*t, Token::Let);
                     assert_eq!(*n, ast::Expression::Identifier(Token::Ident(tt.to_string())));
                 },
+                _ => panic!("It isn't LetStatement!")
+            };
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let input = r#"
+return 5;
+return 10;
+return 993322;
+        "#;
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+
+        let program = p.parse_program();
+        check_parser_errors(&mut p);
+
+        assert_eq!(program.len(), 3);
+        
+        for stmt in program {
+            match stmt {
+                ast::Statement::ReturnStatement{ token: t, value: v } =>
+                    assert_eq!(t, Token::Return),
                 _ => panic!("It isn't LetStatement!")
             };
         }
