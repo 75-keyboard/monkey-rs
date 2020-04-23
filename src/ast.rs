@@ -1,5 +1,4 @@
 use crate::token::Token;
-use crate::lexer::Lexer;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
@@ -11,8 +10,8 @@ pub enum Statement {
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match self {
-           Statement::LetStatement{ token, name, value } => format!("{} {} = {};", token, if let Expression::Identifier(x) = name { x } else { &Token::Illegal }, Token::Illegal),
-           Statement::ReturnStatement{ token, value } => format!("{} {};", token, Token::Illegal),
+           Statement::LetStatement{ token, name, value: _ } => format!("{} {} = {};", token, if let Expression::Identifier(x) = name { x } else { &Token::Illegal }, Token::Illegal),
+           Statement::ReturnStatement{ token, value: _ } => format!("{} {};", token, Token::Illegal),
            _ => "".to_string()
         })
     }
@@ -29,7 +28,6 @@ pub type Program = Vec<Statement>;
 #[cfg(test)]
 mod tests {
     use crate::token::Token;
-    use crate::lexer::Lexer;
     use crate::ast;
     
     #[test]
