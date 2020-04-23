@@ -120,12 +120,17 @@ impl<'a> Parser<'a> {
     fn prefix_parse_fns(&self, _prc: Precedence) -> Option<ast::Expression> {
         match self.cur_token.clone() {
             t @ Token::Ident(_) => Some(self.parse_idetifier(t)),
+            t @ Token::Int(_) => Some(self.parse_integer_literal(t)),
             _ => None
         }
     }
 
     fn parse_idetifier(&self, t: Token) -> ast::Expression {
         ast::Expression::Identifier(t)
+    }
+
+    fn parse_integer_literal(&self, t: Token) -> ast::Expression {
+        ast::Expression::IntegerLiteral(t)
     }
 
     fn cur_token_is(&self, t: Token) -> bool {
@@ -256,5 +261,27 @@ return 993322;
             } else { assert!(false); }
         } else { assert!(false); }
 
+    }
+
+    #[test]
+    fn test_integer_literal_expression() {
+        let input = r#"5;"#;
+
+        let l= Lexer::new(input);
+        let mut p = Parser::new(l);
+        
+        let program = p.parse_program();
+        check_parser_errors(&mut p);
+
+        assert_eq!(program.len(), 1);
+
+        let stmt = program[0].clone();
+        if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
+            if let ast::Expression::IntegerLiteral(x) = e {
+                if let Token::Int(num) = x {
+                    assert_eq!(num, 5);
+                } else { assert!(false); }
+            } else { assert!(false); }
+        } else { assert!(false); }
     }
 }

@@ -20,7 +20,8 @@ impl std::fmt::Display for Statement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
-    Identifier(Token)
+    Identifier(Token),
+    IntegerLiteral(Token)
 }
 
 pub type Program = Vec<Statement>;
