@@ -128,9 +128,11 @@ impl<'a> Parser<'a> {
 
     fn parse_expression(&mut self, prc: Precedence) -> Option<ast::Expression> {
         let mut left_expr = match self.cur_token {
-            Token::Ident(_) => Some(self.parse_ident()),
-            Token::Int(_) => Some(self.parse_integer_literal()),
-            Token::Bang | Token::Minus => Some(self.parse_prefix_expression()),
+            Token::Ident(_) => self.parse_ident(),
+            Token::Int(_) => self.parse_integer_literal(),
+            Token::True | Token::False => self.parse_boolean(),
+            Token::Bang | Token::Minus => self.parse_prefix_expression(),
+            Token::Lparen => self.parse_grouped_expression(),
             _ => {
                 self.no_prefix_parse_fn_error(self.cur_token.clone());
                 return None;
@@ -141,7 +143,7 @@ impl<'a> Parser<'a> {
             match self.peek_token {
                 Token::Plus | Token::Minus | Token::Slash | Token::Asterisk | Token::Equal | Token::NotEqual | Token::Lt | Token::Gt => {
                     self.next_token();
-                    left_expr = Some(self.parse_infix_expression(left_expr.unwrap()));
+                    left_expr = self.parse_infix_expression(left_expr.unwrap());
                 },
                 _ => break
             }
@@ -149,28 +151,43 @@ impl<'a> Parser<'a> {
         left_expr
     }
 
-    fn parse_ident(&self) -> ast::Expression {
-        ast::Expression::Identifier(self.cur_token.clone())
+    fn parse_ident(&self) -> Option<ast::Expression> {
+        Some(ast::Expression::Identifier(self.cur_token.clone()))
     }
 
-    fn parse_integer_literal(&self) -> ast::Expression {
-        ast::Expression::IntegerLiteral(self.cur_token.clone())
+    fn parse_integer_literal(&self) -> Option<ast::Expression> {
+        Some(ast::Expression::IntegerLiteral(self.cur_token.clone()))
     }
 
-    fn parse_prefix_expression(&mut self) -> ast::Expression {
+    fn parse_boolean(&self) -> Option<ast::Expression> {
+        Some(ast::Expression::Boolean(self.cur_token.clone()))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<ast::Expression> {
+        self.next_token();
+
+        let expr = self.parse_expression(Precedence::Lowest);
+        if !self.expect_peek(Token::Rparen) {
+            return None;
+        }
+
+        expr
+    }
+
+    fn parse_prefix_expression(&mut self) -> Option<ast::Expression> {
         let ct = self.cur_token.clone();
         let opr = format!("{}", ct);
         self.next_token();
-        ast::Expression::PrefixExpression{ token: ct, opr: opr, right: Box::new(self.parse_expression(Precedence::Prefix).unwrap())}
+        Some(ast::Expression::PrefixExpression{ token: ct, opr: opr, right: Box::new(self.parse_expression(Precedence::Prefix).unwrap())})
     }
 
-    fn parse_infix_expression(&mut self, left: ast::Expression) -> ast::Expression {
+    fn parse_infix_expression(&mut self, left: ast::Expression) -> Option<ast::Expression> {
         let ct = self.cur_token.clone();
         let opr = format!("{}", ct);
         let prc = self.cur_precedence();
         self.next_token();
         let right = self.parse_expression(prc).unwrap();
-        ast::Expression::InfixExpression{ token: ct, left: Box::new(left), opr: opr, right: Box::new(right)}
+        Some(ast::Expression::InfixExpression{ token: ct, left: Box::new(left), opr: opr, right: Box::new(right)})
     }
 
     fn cur_precedence(&self) -> Precedence {
@@ -228,6 +245,59 @@ mod tests {
             println!("parser error: {}", msg);
         }
         panic!("paniced");
+    }
+
+    fn test_integer_literal(il: ast::Expression, num: i64) {
+        if let ast::Expression::IntegerLiteral(x) = il {
+            if let Token::Int(n) = x {
+                assert_eq!(n, num);
+            } else { assert!(false); }
+        } else { assert!(false); }
+    }
+
+    fn test_boolean(bl: ast::Expression, b: bool) {
+        if let ast::Expression::Boolean(x) = bl {
+            match x {
+                Token::True => assert_eq!(b, true),
+                Token::False => assert_eq!(b, false),
+                _ => assert!(false)
+            }
+        } else { assert!(false); }
+    }
+
+    fn test_identifier(expr: ast::Expression, value: &str) {
+        if let ast::Expression::Identifier(x) = expr {
+            if let Token::Ident(id) = x {
+                assert_eq!(id, value.to_string());
+            } else { assert!(false); }
+        } else { assert!(false); }
+    }
+
+    fn test_expression(expr: ast::Expression, expected: ast::Expression) {
+        match expected {
+            ast::Expression::IntegerLiteral(x) => {
+                if let Token::Int(n) = x {
+                    test_integer_literal(expr, n);
+                } else { assert!(false); }
+            },
+            ast::Expression::Identifier(x) => {
+                if let Token::Ident(n) = x {
+                    test_identifier(expr, &*n);
+                } else { assert!(false); }
+            },
+            _ => assert!(false)
+        }
+    }
+
+    fn test_infix_expression(expr: ast::Expression, l: ast::Expression, o: &str, r: ast::Expression) {
+        match expr {
+            ast::Expression::InfixExpression{ left, opr, right, .. } => {
+                assert_eq!(l, *left);
+                assert_eq!(o, opr);
+                assert_eq!(r, *right);
+            },
+            _ => assert!(false)
+        }
     }
 
     #[test]
@@ -386,6 +456,8 @@ return 993322;
     #[test]
     fn test_operator_precedence_parsing() {
         let tests = vec![
+            (r#"3 > 5 == false"#, r#"((3 > 5) == false)"#),
+            (r#"3 < 5 == true"#, r#"((3 < 5) == true)"#),
             (r#"-a * b"#, r#"((-a) * b)"#),
             (r#"!-a"#, r#"(!(-a))"#),
             (r#"a + b + c"#, r#"((a + b) + c)"#),
@@ -397,7 +469,12 @@ return 993322;
             (r#"3 + 4; -5 * 5"#, r#"(3 + 4)((-5) * 5)"#),
             (r#"5 > 4 == 3 < 4"#, r#"((5 > 4) == (3 < 4))"#),
             (r#"5 > 4 != 3 < 4"#, r#"((5 > 4) != (3 < 4))"#),
-            (r#"3 + 4 * 5 == 3 * 1 + 4 * 5"#, r#"((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"#)
+            (r#"3 + 4 * 5 == 3 * 1 + 4 * 5"#, r#"((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"#),
+            (r#"1 + (2 + 3) + 4"#, r#"((1 + (2 + 3)) + 4)"#),
+            (r#"(5 + 5) * 2"#, r#"((5 + 5) * 2)"#),
+            (r#"2 / (5 + 5)"#, r#"(2 / (5 + 5))"#),
+            (r#"-(5 + 5)"#, r#"(-(5 + 5))"#),
+            (r#"!(true == true)"#, r#"(!(true == true))"#),
         ];
 
         for tt in tests {
@@ -405,51 +482,25 @@ return 993322;
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(&mut p);
-            println!("{:?}", program.statements);
             assert_eq!(format!("{}", program), tt.1);
         }
     }
 
-    fn test_integer_literal(il: ast::Expression, num: i64) {
-        if let ast::Expression::IntegerLiteral(x) = il {
-            if let Token::Int(n) = x {
-                assert_eq!(n, num);
+    #[test]
+    fn test_boolean_expression() {
+        let tests = vec![
+            ("true", true),
+            ("false", false),
+        ];
+        for tt in tests {
+            let l = Lexer::new(tt.0);
+            let mut p = Parser::new(l);
+            let program = p.parse_program();
+            check_parser_errors(&mut p);
+            assert_eq!(program.statements.len(), 1);
+            if let ast::Statement::ExpressionStatement{ expr: e, .. } = program.statements[0].clone() {
+                test_boolean(e, tt.1);
             } else { assert!(false); }
-        } else { assert!(false); }
-    }
-
-    fn test_identifier(expr: ast::Expression, value: &str) {
-        if let ast::Expression::Identifier(x) = expr {
-            if let Token::Ident(id) = x {
-                assert_eq!(id, value.to_string());
-            } else { assert!(false); }
-        } else { assert!(false); }
-    }
-
-    fn test_expression(expr: ast::Expression, expected: ast::Expression) {
-        match expected {
-            ast::Expression::IntegerLiteral(x) => {
-                if let Token::Int(n) = x {
-                    test_integer_literal(expr, n);
-                } else { assert!(false); }
-            },
-            ast::Expression::Identifier(x) => {
-                if let Token::Ident(n) = x {
-                    test_identifier(expr, &*n);
-                } else { assert!(false); }
-            },
-            _ => assert!(false)
-        }
-    }
-
-    fn test_infix_expression(expr: ast::Expression, l: ast::Expression, o: &str, r: ast::Expression) {
-        match expr {
-            ast::Expression::InfixExpression{ left, opr, right, .. } => {
-                assert_eq!(l, left);
-                assert_eq!(o, opr);
-                assert_eq!(r, right);
-            },
-            _ => assert!(false)
         }
     }
 }

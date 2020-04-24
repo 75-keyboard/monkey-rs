@@ -22,6 +22,7 @@ impl std::fmt::Display for Statement {
 pub enum Expression {
     Identifier(Token),
     IntegerLiteral(Token),
+    Boolean(Token),
     PrefixExpression{ token: Token, opr: String, right: Box<Expression> },
     InfixExpression{ token: Token, left: Box<Expression>, opr: String, right: Box<Expression> },
 }
@@ -31,6 +32,7 @@ impl std::fmt::Display for Expression {
         write!(f, "{}", match self {
             Expression::Identifier(x) => format!("{}", x),
             Expression::IntegerLiteral(x) => format!("{}", x),
+            Expression::Boolean(x) => format!("{}", x),
             Expression::PrefixExpression{ token: _, opr, right } => format!("({}{})", opr, right),
             Expression::InfixExpression{ token: _, left, opr, right } => format!("({} {} {})", left, opr, right),
         })
