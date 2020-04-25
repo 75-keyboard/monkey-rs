@@ -26,6 +26,8 @@ pub enum Expression {
     PrefixExpression{ opr: Token, right: Box<Expression> },
     InfixExpression{ left: Box<Expression>, opr: Token, right: Box<Expression> },
     IfExpression{ condition: Box<Expression>, conseqence: Program, alternative: Option<Program> },
+    FnLiteral{ parameters: Vec<Expression>, body: Program },
+    CallExpression{ function: Box<Expression>, arguments: Vec<Expression> },
 }
 
 impl std::fmt::Display for Expression {
@@ -42,7 +44,34 @@ impl std::fmt::Display for Expression {
                 } else {
                     format!("if {} {}", condition, conseqence)
                 }
+            },
+            Expression::FnLiteral{ parameters, body } => {
+                format!("fn({}) {{ {} }}", 
+                    parameters.iter().enumerate().fold(
+                        String::new(), |s, (i, p)| {
+                            println!("{:?} {:?}", i, p);
+                            if i != parameters.len()-1 {
+                                format!("{}{}, ", s, p)
+                            } else {
+                                format!("{}{}", s, p)
+                            }}
+                        )
+                    , body)
+            },
+            Expression::CallExpression{ function, arguments } => {
+                format!("{}({})", 
+                    function,
+                    arguments.iter().enumerate().fold(
+                        String::new(), |s, (i, p)| {
+                            println!("{:?} {:?}", i, p);
+                            if i != arguments.len()-1 {
+                                format!("{}{}, ", s, p)
+                            } else {
+                                format!("{}{}", s, p)
+                            }}
+                    ))
             }
+            _ => "".to_string()
         })
     }
 }
@@ -94,11 +123,16 @@ mod tests {
         let program = ast::Program::new_with_vec(vec![
             ast::Statement::LetStatement{ name: ast::Expression::Identifier(Token::Ident("myVar".to_string())), value: ast::Expression::Identifier(Token::Int(15)) },
             ast::Statement::ReturnStatement{ value: ast::Expression::Identifier(Token::Ident("aaa".to_string())) },
+            ast::Statement::ExpressionStatement{ expr: ast::Expression::FnLiteral{
+                parameters: vec![ast::Expression::Identifier(Token::Ident("x".to_string())), ast::Expression::Identifier(Token::Ident("y".to_string()))],
+                body: ast::Program(vec![ ast::Statement::ReturnStatement{ value: ast::Expression::InfixExpression{ left: Box::new(ast::Expression::Identifier(Token::Ident("x".to_string()))) , opr: Token::Gt, right: Box::new(ast::Expression::Identifier(Token::Ident("y".to_string()))) } } ])
+            } }
         ]);
 
         let tests = vec![
             "let myVar = 15;",
-            "return aaa;"
+            "return aaa;",
+            "fn(x, y) { return (x > y); }"
         ];
 
         for (i, tt) in tests.iter().enumerate() {
