@@ -2,6 +2,8 @@ pub mod lexer;
 pub mod ast;
 pub mod token;
 pub mod parser;
+pub mod object;
+pub mod evaluator;
 
 use lexer::Lexer;
 use std::io::{self};
@@ -16,7 +18,11 @@ fn main() {
         let mut p = Parser::new(l);
         let program = p.parse_program();
         if p.errors().len() != 0 { print_parser_errors(p.errors()); continue; }
-        println!("{}", program);
+
+        if let Some(evaluated) = evaluator::eval(evaluator::Node::Program(program)) {
+            println!("{}", evaluated);
+        }
+
         println!(">> ");
         buffer = "".to_string();
     }
@@ -24,7 +30,7 @@ fn main() {
 
 fn print_parser_errors(errors: Vec<String>) {
     
-    let MonkeyFace = r#"            __,__
+    let monkey_face = r#"            __,__
        .--.  .-"     "-.  .--.
       / .. \/  .-. .-.  \/ .. \
      | |  '|  /   Y   \  |'  | |
@@ -36,7 +42,7 @@ fn print_parser_errors(errors: Vec<String>) {
             '._ '-=-' _.'
                '-----'
     "#;
-    println!("{}\nWoops! We ran into some monkey business here!\n parser errors:", MonkeyFace);
+    println!("{}\nWoops! We ran into some monkey business here!\n parser errors:", monkey_face);
     for msg in errors {
         println!("{}", msg);
     }

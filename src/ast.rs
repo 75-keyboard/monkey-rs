@@ -71,7 +71,6 @@ impl std::fmt::Display for Expression {
                             }}
                     ))
             }
-            _ => "".to_string()
         })
     }
 }
