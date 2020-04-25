@@ -23,6 +23,20 @@ fn main() {
 }
 
 fn print_parser_errors(errors: Vec<String>) {
+    
+    let MonkeyFace = r#"            __,__
+       .--.  .-"     "-.  .--.
+      / .. \/  .-. .-.  \/ .. \
+     | |  '|  /   Y   \  |'  | |
+     | \   \  \ 0 | 0 /  /   / |
+      \ '- ,\.-"""""""-./, -' /
+       ''-' /_   ^ ^   _\ '-''
+           |  \._   _./  |
+           \   \ '~' /   /
+            '._ '-=-' _.'
+               '-----'
+    "#;
+    println!("{}\nWoops! We ran into some monkey business here!\n parser errors:", MonkeyFace);
     for msg in errors {
         println!("{}", msg);
     }
