@@ -71,7 +71,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_let_statement(&mut self) -> Option<ast::Statement> {
-        let ct = self.cur_token.clone();
         self.next_token();
 
         let n = match self.cur_token.clone() {
@@ -93,22 +92,20 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
         
-        Some(ast::Statement::LetStatement{ token: ct, name: n.clone(), value: n})
+        Some(ast::Statement::LetStatement{ name: n.clone(), value: n})
     }
     
     fn parse_return_statement(&mut self) -> Option<ast::Statement> {
-        let ct = self.cur_token.clone();
         self.next_token();
 
         while !self.cur_token_is(Token::Semicolon) {
             self.next_token();
         }
 
-        Some(ast::Statement::ReturnStatement{ token: ct, value: ast::Expression::Identifier(Token::Semicolon)})
+        Some(ast::Statement::ReturnStatement{ value: ast::Expression::Identifier(Token::Semicolon)})
     }
 
     fn parse_expression_statement(&mut self) -> Option<ast::Statement> {
-        let ct = self.cur_token.clone();
         let expr = self.parse_expression(Precedence::Lowest);
 
         if self.peek_token_is(Token::Semicolon) {
@@ -116,7 +113,7 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(x) = expr {
-            Some(ast::Statement::ExpressionStatement{ token: ct, expr: x })
+            Some(ast::Statement::ExpressionStatement{ expr: x })
         } else {
             None
         }
@@ -178,7 +175,7 @@ impl<'a> Parser<'a> {
         let ct = self.cur_token.clone();
         let opr = format!("{}", ct);
         self.next_token();
-        Some(ast::Expression::PrefixExpression{ token: ct, opr: opr, right: Box::new(self.parse_expression(Precedence::Prefix).unwrap())})
+        Some(ast::Expression::PrefixExpression{ opr: opr, right: Box::new(self.parse_expression(Precedence::Prefix).unwrap())})
     }
 
     fn parse_infix_expression(&mut self, left: ast::Expression) -> Option<ast::Expression> {
@@ -187,7 +184,7 @@ impl<'a> Parser<'a> {
         let prc = self.cur_precedence();
         self.next_token();
         let right = self.parse_expression(prc).unwrap();
-        Some(ast::Expression::InfixExpression{ token: ct, left: Box::new(left), opr: opr, right: Box::new(right)})
+        Some(ast::Expression::InfixExpression{ left: Box::new(left), opr: opr, right: Box::new(right)})
     }
 
     fn cur_precedence(&self) -> Precedence {
@@ -323,8 +320,7 @@ let foobar = 838383;
 
         for (i, tt) in tests.iter().enumerate() {
             match &program.statements[i] {
-                ast::Statement::LetStatement{ token: t, name: n, value: _v } => {
-                    assert_eq!(*t, Token::Let);
+                ast::Statement::LetStatement{ name: n, value: _v } => {
                     assert_eq!(*n, ast::Expression::Identifier(Token::Ident(tt.to_string())));
                 },
                 _ => panic!("It isn't LetStatement!")
@@ -349,8 +345,8 @@ return 993322;
         
         for stmt in program.statements {
             match stmt {
-                ast::Statement::ReturnStatement{ token: t, .. } =>
-                    assert_eq!(t, Token::Return),
+                ast::Statement::ReturnStatement{ .. } =>
+                    assert!(true),
                 _ => panic!("It isn't LetStatement!")
             };
         }
@@ -412,7 +408,7 @@ return 993322;
             let stmt = program.statements[0].clone();
 
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
-                if let ast::Expression::PrefixExpression{ token: _, opr, right } = e {
+                if let ast::Expression::PrefixExpression{ opr, right } = e {
                     assert_eq!(opr, tt.1.to_string());
                     test_integer_literal(*right, tt.2);
                 } else { assert!(false); }
@@ -444,7 +440,7 @@ return 993322;
             let stmt = program.statements[0].clone();
 
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
-                if let ast::Expression::InfixExpression{ token: _, left, opr, right } = e {
+                if let ast::Expression::InfixExpression{ left, opr, right } = e {
                     assert_eq!(opr, tt.2.to_string());
                     test_integer_literal(*left, tt.1);
                     test_integer_literal(*right, tt.3);

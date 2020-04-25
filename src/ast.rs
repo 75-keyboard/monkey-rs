@@ -2,17 +2,17 @@ use crate::token::Token;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
-    LetStatement { token: Token, name: Expression, value: Expression },
-    ReturnStatement { token: Token, value: Expression },
-    ExpressionStatement { token: Token, expr: Expression }
+    LetStatement { name: Expression, value: Expression },
+    ReturnStatement { value: Expression },
+    ExpressionStatement { expr: Expression }
 }
 
 impl std::fmt::Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", match self {
-           Statement::LetStatement{ token, name, value } => format!("{} {} = {};", token, name, value),
-           Statement::ReturnStatement{ token, value } => format!("{} {};", token, value),
-           Statement::ExpressionStatement{ token: _, expr } => format!("{}", expr),
+           Statement::LetStatement{ name, value } => format!("let {} = {};", name, value),
+           Statement::ReturnStatement{ value } => format!("return {};", value),
+           Statement::ExpressionStatement{ expr } => format!("{}", expr),
         })
     }
 }
@@ -23,8 +23,9 @@ pub enum Expression {
     Identifier(Token),
     IntegerLiteral(Token),
     Boolean(Token),
-    PrefixExpression{ token: Token, opr: String, right: Box<Expression> },
-    InfixExpression{ token: Token, left: Box<Expression>, opr: String, right: Box<Expression> },
+    PrefixExpression{ opr: String, right: Box<Expression> },
+    InfixExpression{ left: Box<Expression>, opr: String, right: Box<Expression> },
+    IfExpression{ condition: Box<Expression>, conseqence: Box<Program>, alternative: Box<Program> },
 }
 
 impl std::fmt::Display for Expression {
@@ -33,12 +34,14 @@ impl std::fmt::Display for Expression {
             Expression::Identifier(x) => format!("{}", x),
             Expression::IntegerLiteral(x) => format!("{}", x),
             Expression::Boolean(x) => format!("{}", x),
-            Expression::PrefixExpression{ token: _, opr, right } => format!("({}{})", opr, right),
-            Expression::InfixExpression{ token: _, left, opr, right } => format!("({} {} {})", left, opr, right),
+            Expression::PrefixExpression{ opr, right } => format!("({}{})", opr, right),
+            Expression::InfixExpression{ left, opr, right } => format!("({} {} {})", left, opr, right),
+            Expression::IfExpression{ condition, conseqence, alternative } => format!("if {} {} else {}", condition, conseqence, alternative)
         })
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>
 }
@@ -69,8 +72,8 @@ mod tests {
     fn test_string() {
         let mut program: ast::Program = ast::Program::new();
         program.statements = vec![
-            ast::Statement::LetStatement{ token: Token::Let, name: ast::Expression::Identifier(Token::Ident("myVar".to_string())), value: ast::Expression::Identifier(Token::Int(15)) },
-            ast::Statement::ReturnStatement{ token: Token::Return, value: ast::Expression::Identifier(Token::Ident("aaa".to_string())) },
+            ast::Statement::LetStatement{ name: ast::Expression::Identifier(Token::Ident("myVar".to_string())), value: ast::Expression::Identifier(Token::Int(15)) },
+            ast::Statement::ReturnStatement{ value: ast::Expression::Identifier(Token::Ident("aaa".to_string())) },
         ];
 
         let tests = vec![
