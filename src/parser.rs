@@ -55,7 +55,7 @@ impl<'a> Parser<'a> {
         let mut program = ast::Program::new();
         while !self.cur_token_is(Token::Eof) {
             if let Some(x) = self.parse_statement() {
-                program.statements.push(x);
+                program.push(x);
             }
             self.next_token();
         }
@@ -310,7 +310,7 @@ let foobar = 838383;
         let program = p.parse_program();
         check_parser_errors(&mut p);
 
-        assert_eq!(program.statements.len(), 3);
+        assert_eq!(program.len(), 3);
         
         let tests = vec![
             "x",
@@ -319,7 +319,7 @@ let foobar = 838383;
         ];
 
         for (i, tt) in tests.iter().enumerate() {
-            match &program.statements[i] {
+            match &program[i] {
                 ast::Statement::LetStatement{ name: n, value: _v } => {
                     assert_eq!(*n, ast::Expression::Identifier(Token::Ident(tt.to_string())));
                 },
@@ -341,9 +341,9 @@ return 993322;
         let program = p.parse_program();
         check_parser_errors(&mut p);
 
-        assert_eq!(program.statements.len(), 3);
+        assert_eq!(program.len(), 3);
         
-        for stmt in program.statements {
+        for stmt in &*program {
             match stmt {
                 ast::Statement::ReturnStatement{ .. } =>
                     assert!(true),
@@ -364,9 +364,9 @@ return 993322;
         let program = p.parse_program();
         check_parser_errors(&mut p);
 
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(program.len(), 1);
 
-        let stmt = program.statements[0].clone();
+        let stmt = program[0].clone();
         if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
             test_identifier(e, "foobar");
         } else { assert!(false); }
@@ -382,9 +382,9 @@ return 993322;
         let program = p.parse_program();
         check_parser_errors(&mut p);
 
-        assert_eq!(program.statements.len(), 1);
+        assert_eq!(program.len(), 1);
 
-        let stmt = program.statements[0].clone();
+        let stmt = program[0].clone();
         if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
             test_integer_literal(e, 5);
         } else { assert!(false); }
@@ -403,9 +403,9 @@ return 993322;
             let program = p.parse_program();
             check_parser_errors(&mut p);
 
-            assert_eq!(program.statements.len(), 1);
+            assert_eq!(program.len(), 1);
 
-            let stmt = program.statements[0].clone();
+            let stmt = program[0].clone();
 
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
                 if let ast::Expression::PrefixExpression{ opr, right } = e {
@@ -435,9 +435,9 @@ return 993322;
             let program = p.parse_program();
             check_parser_errors(&mut p);
 
-            assert_eq!(program.statements.len(), 1);
+            assert_eq!(program.len(), 1);
 
-            let stmt = program.statements[0].clone();
+            let stmt = program[0].clone();
 
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
                 if let ast::Expression::InfixExpression{ left, opr, right } = e {
@@ -493,8 +493,8 @@ return 993322;
             let mut p = Parser::new(l);
             let program = p.parse_program();
             check_parser_errors(&mut p);
-            assert_eq!(program.statements.len(), 1);
-            if let ast::Statement::ExpressionStatement{ expr: e, .. } = program.statements[0].clone() {
+            assert_eq!(program.len(), 1);
+            if let ast::Statement::ExpressionStatement{ expr: e, .. } = program[0].clone() {
                 test_boolean(e, tt.1);
             } else { assert!(false); }
         }

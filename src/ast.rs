@@ -42,20 +42,35 @@ impl std::fmt::Display for Expression {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Program {
-    pub statements: Vec<Statement>
+pub struct Program (Vec<Statement>);
+
+impl std::ops::Deref for Program {
+    type Target = Vec<Statement>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Program {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl Program {
     pub fn new() -> Program {
-        Program { statements: Vec::new() }
+        Program(Vec::new())
+    }
+    
+    pub fn new_with_vec(v: Vec<Statement>) -> Program {
+        Program(v)
     }
 }
 
 impl std::fmt::Display for Program {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut s: String = "".to_string();
-        for i in self.statements.clone() {
+        for i in &*self.clone() {
             s = format!("{}{}", s, i);
         }
 
@@ -70,11 +85,10 @@ mod tests {
     
     #[test]
     fn test_string() {
-        let mut program: ast::Program = ast::Program::new();
-        program.statements = vec![
+        let program = ast::Program::new_with_vec(vec![
             ast::Statement::LetStatement{ name: ast::Expression::Identifier(Token::Ident("myVar".to_string())), value: ast::Expression::Identifier(Token::Int(15)) },
             ast::Statement::ReturnStatement{ value: ast::Expression::Identifier(Token::Ident("aaa".to_string())) },
-        ];
+        ]);
 
         let tests = vec![
             "let myVar = 15;",
@@ -82,7 +96,7 @@ mod tests {
         ];
 
         for (i, tt) in tests.iter().enumerate() {
-            assert_eq!(**tt, format!("{}", program.statements[i]));
+            assert_eq!(**tt, format!("{}", program[i]));
         }
     }
 }
