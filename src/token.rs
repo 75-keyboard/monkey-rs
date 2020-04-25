@@ -38,42 +38,41 @@ pub enum Token {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", 
-            match self {
-                Token::Illegal => "ILLEGAL".to_string(),
-                Token::Eof => "EOF".to_string(),
+        match self {
+            Token::Illegal => write!(f, "ILLEGAL"),
+            Token::Eof => write!(f, "EOF"),
 
-                Token::Ident(x) => x.clone(),
-                Token::Int(x) => x.to_string(),
+            Token::Ident(x) => write!(f, "{}", x),
+            Token::Int(x) => write!(f, "{}", x),
 
-                Token::Assign => "=".to_string(),
-                Token::Plus => "+".to_string(),
-                Token::Minus => "-".to_string(),
-                Token::Bang => "!".to_string(),
-                Token::Asterisk => "*".to_string(),
-                Token::Slash => "/".to_string(),
+            Token::Assign => write!(f, "="),
+            Token::Plus => write!(f, "+"),
+            Token::Minus => write!(f, "-"),
+            Token::Bang => write!(f, "!"),
+            Token::Asterisk => write!(f, "*"),
+            Token::Slash => write!(f, "/"),
 
-                Token::Lt => "<".to_string(),
-                Token::Gt => ">".to_string(),
+            Token::Lt => write!(f, "<"),
+            Token::Gt => write!(f, ">"),
 
-                Token::Comma => ".to_string(),".to_string(),
-                Token::Semicolon => ";".to_string(),
+            Token::Comma => write!(f, "),"),
+            Token::Semicolon => write!(f, ";"),
 
-                Token::Lparen => "(".to_string(),
-                Token::Rparen => ")".to_string(),
-                Token::Lbrace => "{".to_string(),
-                Token::Rbrace => "}".to_string(),
+            Token::Lparen => write!(f, "("),
+            Token::Rparen => write!(f, ")"),
+            Token::Lbrace => write!(f, "{{"),
+            Token::Rbrace => write!(f, "}}"),
 
-                Token::Function => "fn".to_string(),
-                Token::Let => "let".to_string(),
-                Token::If => "if".to_string(),
-                Token::Return => "return".to_string(),
-                Token::Else => "else".to_string(),
-                Token::True => "true".to_string(),
-                Token::False => "false".to_string(),
+            Token::Function => write!(f, "fn"),
+            Token::Let => write!(f, "let"),
+            Token::If => write!(f, "if"),
+            Token::Return => write!(f, "return"),
+            Token::Else => write!(f, "else"),
+            Token::True => write!(f, "true"),
+            Token::False => write!(f, "false"),
 
-                Token::Equal => "==".to_string(),
-                Token::NotEqual => "!=".to_string()
-            })
+            Token::Equal => write!(f, "=="),
+            Token::NotEqual => write!(f, "!=")
+        }
     }
 }
