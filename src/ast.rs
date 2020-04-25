@@ -25,7 +25,7 @@ pub enum Expression {
     Boolean(Token),
     PrefixExpression{ opr: Token, right: Box<Expression> },
     InfixExpression{ left: Box<Expression>, opr: Token, right: Box<Expression> },
-    IfExpression{ condition: Box<Expression>, conseqence: Box<Program>, alternative: Box<Program> },
+    IfExpression{ condition: Box<Expression>, conseqence: Program, alternative: Option<Program> },
 }
 
 impl std::fmt::Display for Expression {
@@ -36,7 +36,13 @@ impl std::fmt::Display for Expression {
             Expression::Boolean(x) => format!("{}", x),
             Expression::PrefixExpression{ opr, right } => format!("({}{})", opr, right),
             Expression::InfixExpression{ left, opr, right } => format!("({} {} {})", left, opr, right),
-            Expression::IfExpression{ condition, conseqence, alternative } => format!("if {} {} else {}", condition, conseqence, alternative)
+            Expression::IfExpression{ condition, conseqence, alternative } => {
+                if let Some(alt) = alternative {
+                    format!("if {} {} else {}", condition, conseqence, alt)
+                } else {
+                    format!("if {} {}", condition, conseqence)
+                }
+            }
         })
     }
 }

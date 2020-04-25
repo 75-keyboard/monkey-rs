@@ -130,6 +130,7 @@ impl<'a> Parser<'a> {
             Token::True | Token::False => self.parse_boolean(),
             Token::Bang | Token::Minus => self.parse_prefix_expression(),
             Token::Lparen => self.parse_grouped_expression(),
+            Token::If => self.parse_if_expression(),
             _ => {
                 self.no_prefix_parse_fn_error(self.cur_token.clone());
                 return None;
@@ -169,6 +170,42 @@ impl<'a> Parser<'a> {
         }
 
         expr
+    }
+
+    fn parse_block_statement(&mut self) -> Option<ast::Program> {
+        let mut program = ast::Program::new();
+        self.next_token();
+
+        while !self.cur_token_is(Token::Rbrace) && !self.cur_token_is(Token::Eof) {
+            if let Some(stmt) = self.parse_statement() {
+                program.push(stmt);
+            }
+            self.next_token()
+        }
+        
+        if program.len() != 0 { Some(program) } else { None }
+    }
+
+    fn parse_if_expression(&mut self) -> Option<ast::Expression> {
+        if !self.expect_peek(Token::Lparen) { return None }
+        self.next_token();
+
+        let cd = self.parse_expression(Precedence::Lowest);
+
+        if cd != None && !self.expect_peek(Token::Rparen) { return None }
+        if !self.expect_peek(Token::Lbrace) { return None }
+
+        let cns = self.parse_block_statement();
+        let mut alt = None;
+
+        if self.peek_token_is(Token::Else) {
+            self.next_token();
+            if !self.expect_peek(Token::Lbrace) { return None }
+            
+            alt = self.parse_block_statement();
+        }
+
+        Some(ast::Expression::IfExpression { condition: Box::new(cd.unwrap()), conseqence: cns.unwrap(), alternative: alt })
     }
 
     fn parse_prefix_expression(&mut self) -> Option<ast::Expression> {
@@ -498,6 +535,61 @@ return 993322;
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = program[0].clone() {
                 test_boolean(e, tt.1);
             } else { assert!(false); }
+        }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = r#"if (x < y) { x }"#;
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(&mut p);
+
+        assert_eq!(1, program.len());
+
+        let stmt = program[0].clone();
+
+        match stmt {
+            ast::Statement::ExpressionStatement{ expr } => {
+                match expr {
+                    ast::Expression::IfExpression{ condition, conseqence, alternative } => {
+                        test_infix_expression(*condition, ast::Expression::Identifier(Token::Ident("x".to_string())), Token::Lt, ast::Expression::Identifier(Token::Ident("y".to_string())));
+                        assert_eq!(conseqence.len(), 1);
+                        assert_eq!(alternative, None);
+                    },
+                    _ => assert!(false)
+                }
+            },
+            _ => assert!(false)
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = r#"if (x < y) { x } else { y }"#;
+        let l = Lexer::new(input);
+        let mut p = Parser::new(l);
+        let program = p.parse_program();
+        check_parser_errors(&mut p);
+
+        assert_eq!(1, program.len());
+
+        let stmt = program[0].clone();
+
+        match stmt {
+            ast::Statement::ExpressionStatement{ expr } => {
+                match expr {
+                    ast::Expression::IfExpression{ condition, conseqence, alternative } => {
+                        test_infix_expression(*condition, ast::Expression::Identifier(Token::Ident("x".to_string())), Token::Lt, ast::Expression::Identifier(Token::Ident("y".to_string())));
+                        assert_eq!(conseqence.len(), 1);
+                        assert_ne!(alternative, None);
+                        assert_eq!(alternative.unwrap().len(), 1);
+                    },
+                    _ => assert!(false)
+                }
+            },
+            _ => assert!(false)
         }
     }
 }
