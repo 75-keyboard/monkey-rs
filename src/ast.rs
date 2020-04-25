@@ -23,8 +23,8 @@ pub enum Expression {
     Identifier(Token),
     IntegerLiteral(Token),
     Boolean(Token),
-    PrefixExpression{ opr: String, right: Box<Expression> },
-    InfixExpression{ left: Box<Expression>, opr: String, right: Box<Expression> },
+    PrefixExpression{ opr: Token, right: Box<Expression> },
+    InfixExpression{ left: Box<Expression>, opr: Token, right: Box<Expression> },
     IfExpression{ condition: Box<Expression>, conseqence: Box<Program>, alternative: Box<Program> },
 }
 

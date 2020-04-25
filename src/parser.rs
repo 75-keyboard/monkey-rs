@@ -172,15 +172,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_prefix_expression(&mut self) -> Option<ast::Expression> {
-        let ct = self.cur_token.clone();
-        let opr = format!("{}", ct);
+        let opr = self.cur_token.clone();
         self.next_token();
         Some(ast::Expression::PrefixExpression{ opr: opr, right: Box::new(self.parse_expression(Precedence::Prefix).unwrap())})
     }
 
     fn parse_infix_expression(&mut self, left: ast::Expression) -> Option<ast::Expression> {
-        let ct = self.cur_token.clone();
-        let opr = format!("{}", ct);
+        let opr = self.cur_token.clone();
         let prc = self.cur_precedence();
         self.next_token();
         let right = self.parse_expression(prc).unwrap();
@@ -282,11 +280,14 @@ mod tests {
                     test_identifier(expr, &*n);
                 } else { assert!(false); }
             },
+            ast::Expression::InfixExpression{ left, opr, right } => {
+                test_infix_expression(expr, *left, opr, *right);
+            }
             _ => assert!(false)
         }
     }
 
-    fn test_infix_expression(expr: ast::Expression, l: ast::Expression, o: &str, r: ast::Expression) {
+    fn test_infix_expression(expr: ast::Expression, l: ast::Expression, o: Token, r: ast::Expression) {
         match expr {
             ast::Expression::InfixExpression{ left, opr, right, .. } => {
                 assert_eq!(l, *left);
@@ -393,8 +394,8 @@ return 993322;
     #[test]
     fn test_parsing_prefix_expressions() {
         let tests = vec![
-            ("!5;", "!", 5),
-            ("-15;", "-", 15),
+            ("!5;", Token::Bang, 5),
+            ("-15;", Token::Minus, 15),
         ];
 
         for tt in tests {
@@ -409,7 +410,7 @@ return 993322;
 
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
                 if let ast::Expression::PrefixExpression{ opr, right } = e {
-                    assert_eq!(opr, tt.1.to_string());
+                    assert_eq!(opr, tt.1);
                     test_integer_literal(*right, tt.2);
                 } else { assert!(false); }
             } else { assert!(false); }
@@ -419,14 +420,14 @@ return 993322;
     #[test]
     fn test_parsing_infix_expressions() {
         let tests = vec![
-            ("5 + 6;", 5, "+", 6),
-            ("5 - 5;", 5, "-", 5),
-            ("5 * 5;", 5, "*", 5),
-            ("5 / 5;", 5, "/", 5),
-            ("5 > 5;", 5, ">", 5),
-            ("5 < 5;", 5, "<", 5),
-            ("5 == 5;", 5, "==", 5),
-            ("5 != 5;", 5, "!=", 5),
+            ("5 + 6;", 5, Token::Plus, 6),
+            ("5 - 5;", 5, Token::Minus, 5),
+            ("5 * 5;", 5, Token::Asterisk, 5),
+            ("5 / 5;", 5, Token::Slash, 5),
+            ("5 > 5;", 5, Token::Gt, 5),
+            ("5 < 5;", 5, Token::Lt, 5),
+            ("5 == 5;", 5, Token::Equal, 5),
+            ("5 != 5;", 5, Token::NotEqual, 5),
         ];
 
         for tt in tests {
@@ -441,7 +442,7 @@ return 993322;
 
             if let ast::Statement::ExpressionStatement{ expr: e, .. } = stmt {
                 if let ast::Expression::InfixExpression{ left, opr, right } = e {
-                    assert_eq!(opr, tt.2.to_string());
+                    assert_eq!(opr, tt.2);
                     test_integer_literal(*left, tt.1);
                     test_integer_literal(*right, tt.3);
                 } else { assert!(false); }
