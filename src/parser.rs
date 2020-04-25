@@ -88,22 +88,29 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(Token::Assign) {
             return None;
         }
+        self.next_token();
 
-        while !self.cur_token_is(Token::Semicolon) {
+        let val = if let Some(v) = self.parse_expression(Precedence::Lowest) {
+            v } else { return None };
+
+        if self.peek_token_is(Token::Semicolon) {
             self.next_token();
         }
         
-        Some(ast::Statement::LetStatement{ name: n.clone(), value: n})
+        Some(ast::Statement::LetStatement{ name: n.clone(), value: val })
     }
     
     fn parse_return_statement(&mut self) -> Option<ast::Statement> {
         self.next_token();
 
-        while !self.cur_token_is(Token::Semicolon) {
+        let val = if let Some(v) = self.parse_expression(Precedence::Lowest) {
+            v } else { return None };
+
+        if self.peek_token_is(Token::Semicolon) {
             self.next_token();
         }
 
-        Some(ast::Statement::ReturnStatement{ value: ast::Expression::Identifier(Token::Semicolon)})
+        Some(ast::Statement::ReturnStatement{ value: val})
     }
 
     fn parse_expression_statement(&mut self) -> Option<ast::Statement> {
