@@ -28,6 +28,9 @@ pub fn eval(node: Node) -> Option<Object> {
                 let right = eval(Node::Expression(*right));
                 eval_prefix_expression(opr, right)
             },
+            ast::Expression::IfExpression{ condition, conseqence, alternative } => {
+                eval_if_expression(*condition, conseqence, alternative)
+            }
             _ => None
         }
     }
@@ -39,6 +42,20 @@ fn eval_statements(stmts: ast::Program) -> Option<Object> {
         result = eval(Node::Statement(stmt.clone()));
     }
     result
+}
+
+fn eval_if_expression(condition: ast::Expression, conseqence: ast::Program, alternative: Option<ast::Program>) -> Option<Object> {
+    let cd = eval(Node::Expression(condition));
+    match cd {
+        Some(Object::Boolean(false)) | Some(Object::Null) => {
+            if let Some(x) = alternative {
+                eval(Node::Program(x))
+            } else {
+                Some(Object::Null)
+            }
+        },
+        _ => eval(Node::Program(conseqence))
+    }
 }
 
 fn eval_infix_expression(left: Option<Object>, opr: Token, right: Option<Object>) -> Object {
@@ -200,5 +217,30 @@ mod tests {
                 test_boolean_object(evaluated, tt.1);
             } else { assert!(false) }
         }
+    }
+
+    #[test]
+    fn test_if_else_expressions() {
+        let tests = vec![
+            ("if (true) { 10 }", Some(10)),
+            ("if (false) { 10 }", None),
+            ("if (1) { 10 }", Some(10)),
+            ("if (1 < 2) { 10 }", Some(10)),
+            ("if (1 > 2) { 10 }", None),
+            ("if (1 > 2) { 10 } else { 20 }", Some(20)),
+            ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+        ];
+
+        for tt in tests {
+            if let Some(evaluated) = test_eval(tt.0) {
+                if let Some(x) = tt.1 {
+                    test_integer_object(evaluated, x);
+                } else { test_null_object(evaluated); }
+            } else { assert!(false) }
+        }
+    }
+
+    fn test_null_object(obj: Object) {
+        assert_eq!(obj, Object::Null);
     }
 }
