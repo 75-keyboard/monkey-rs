@@ -4,6 +4,7 @@ pub enum Object {
     Boolean(bool),
     Return(Box<Object>),
     Null,
+    Error(String),
 }
 
 impl std::fmt::Display for Object {
@@ -13,6 +14,7 @@ impl std::fmt::Display for Object {
             Object::Boolean(x) => write!(f, "{}", x),
             Object::Return(x) => write!(f, "{}", *x),
             Object::Null => write!(f, "null"),
+            Object::Error(x) => write!(f, "{}", x),
         }
     }
 }
@@ -24,6 +26,7 @@ impl Object {
             Object::Boolean(_) => "BOOLEAN",
             Object::Return(_) => "RETURN",
             Object::Null => "NULL",
+            Object::Error(_) => "ERROR",
         }.to_string()
     }
 }

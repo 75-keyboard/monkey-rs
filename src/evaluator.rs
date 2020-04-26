@@ -20,24 +20,26 @@ pub fn eval(node: Node) -> Option<Object> {
             }
             _ => None
         },
-        Node::Expression(x) => match x {
+        Node::Expression(x) => {
+            //println!("{:?}", x);
+            match x {
             ast::Expression::IntegerLiteral(Token::Int(x)) => Some(Object::Integer(x)),
             ast::Expression::Boolean(Token::True) => Some(Object::Boolean(true)),
             ast::Expression::Boolean(Token::False) => Some(Object::Boolean(false)),
             ast::Expression::InfixExpression{ left, opr, right } => {
-                let left = eval(Node::Expression(*left));
-                let right = eval(Node::Expression(*right));
+                let left = eval(Node::Expression(*left)).unwrap();
+                let right = eval(Node::Expression(*right)).unwrap();
                 Some(eval_infix_expression(left, opr, right))
             }
             ast::Expression::PrefixExpression{ opr, right } => {
                 let right = eval(Node::Expression(*right));
-                eval_prefix_expression(opr, right)
+                Some(eval_prefix_expression(opr, right.unwrap()))
             },
             ast::Expression::IfExpression{ condition, conseqence, alternative } => {
                 eval_if_expression(*condition, conseqence, alternative)
             }
             _ => None
-        }
+        }}
     }
 }
 
@@ -47,6 +49,9 @@ fn eval_statements(stmts: ast::Program) -> Option<Object> {
         result = eval(Node::Statement(stmt.clone()));
         if let Some(Object::Return(x)) = result {
             return Some(*x)
+        }
+        if let Some(Object::Error(x)) = result {
+            return Some(Object::Error(x))
         }
     }
     result
@@ -66,18 +71,19 @@ fn eval_if_expression(condition: ast::Expression, conseqence: ast::Program, alte
     }
 }
 
-fn eval_infix_expression(left: Option<Object>, opr: Token, right: Option<Object>) -> Object {
-    match left {
-        Some(Object::Integer(x)) => match right {
-            Some(Object::Integer(y)) => return eval_integer_infix_expression(x, opr, y),
-            _ => {}
-        }, _ => {}
-    }
-
-    match opr {
-        Token::Equal => native_bool_to_boolean_object(left == right),
-        Token::NotEqual => native_bool_to_boolean_object(left != right),
-        _ => Object::Null
+fn eval_infix_expression(left: Object, opr: Token, right: Object) -> Object {
+    if left.get_type() == "INTEGER" && right.get_type() == "INTEGER" {
+        let x = if let Object::Integer(x) = left { x } else { 0 };
+        let y = if let Object::Integer(x) = right { x } else { 0 };
+        eval_integer_infix_expression(x, opr, y)
+    } else if left.get_type() != right.get_type() {
+        Object::Error(format!("type mismatch: {} {} {}", left.get_type(), opr, right.get_type()))
+    } else if opr == Token::Equal {
+        native_bool_to_boolean_object(left == right)
+    } else if opr == Token::NotEqual {
+        native_bool_to_boolean_object(left != right)
+    } else {
+        Object::Error(format!("unknown operator: {} {} {}", left.get_type(), opr, right.get_type()))
     }
 }
 
@@ -91,7 +97,7 @@ fn eval_integer_infix_expression(left: i64, opr: Token, right: i64) -> Object {
         Token::Gt => native_bool_to_boolean_object(left > right),
         Token::Equal => native_bool_to_boolean_object(left == right),
         Token::NotEqual => native_bool_to_boolean_object(left != right),
-        _ => Object::Null
+        _ => Object::Error(format!("unknown operator: INTEGER {} INTEGER", opr))
     }
 }
 
@@ -102,18 +108,18 @@ fn native_bool_to_boolean_object(b: bool) -> Object {
     }
 }
 
-fn eval_prefix_expression(opr: Token, right: Option<Object>) -> Option<Object> {
+fn eval_prefix_expression(opr: Token, right: Object) -> Object {
     match opr {
-        Token::Minus => Some(eval_minus_prefix_iperator_expression(right.unwrap())),
-        Token::Bang => Some(eval_bang_operator_expression(right.unwrap())),
-        _ => Some(Object::Null)
+        Token::Minus => eval_minus_prefix_iperator_expression(right),
+        Token::Bang => eval_bang_operator_expression(right),
+        _ => Object::Error(format!("unknown operator: {} {}", opr, right.get_type()))
     }
 }
 
 fn eval_minus_prefix_iperator_expression(right: Object) -> Object {
     match right {
         Object::Integer(x) => Object::Integer(-x),
-        _ => Object::Null
+        _ => Object::Error(format!("unknown operator: -{}", right.get_type()))
     }
 }
 
@@ -125,6 +131,7 @@ fn eval_bang_operator_expression(right: Object) -> Object {
         _ => Object::Boolean(false)
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -244,7 +251,7 @@ mod tests {
                 if let Some(x) = tt.1 {
                     test_integer_object(evaluated, x);
                 } else { test_null_object(evaluated); }
-            } else { assert!(false) }
+            } else { panic!("{:?}", tt) }
         }
     }
 
@@ -270,8 +277,63 @@ mod tests {
 
         for tt in tests {
             if let Some(evaluated) = test_eval(tt.0) {
-                test_integer_object(evaluated, tt.1);
+                if evaluated != Object::Null {
+                    test_integer_object(evaluated, tt.1);
+                } else {
+                    test_null_object(evaluated);
+                }
             } else { assert!(false) }
+        }
+    }
+
+    #[test]
+    fn test_error_handling() {
+        let tests = vec![
+            (
+                "5 + true;",
+                "type mismatch: INTEGER + BOOLEAN",
+            ),
+            (
+                "5 + true; 5;",
+                "type mismatch: INTEGER + BOOLEAN",
+            ),
+            (
+                "-true;",
+                "unknown operator: -BOOLEAN",
+            ),
+            (
+                "true + false;",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "5; true + false; 5;",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                "if (10 > 1) { true + false; }",
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            (
+                r#"
+    if (10 > 1) {
+        if (10 > 1) {
+            return true + false;
+        }
+        return 1;
+    }
+    "#,
+                "unknown operator: BOOLEAN + BOOLEAN",
+            ),
+            //(
+            //    "foobar",
+            //    "identifier not found: foobar",
+            //),
+        ];
+
+        for tt in tests {
+            if let Some(Object::Error(x)) = test_eval(tt.0) {
+                assert_eq!(&x, tt.1);
+            } else { panic!("{:?}", tt) }
         }
     }
 }
