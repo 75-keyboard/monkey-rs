@@ -13,6 +13,11 @@ pub fn eval(node: Node) -> Option<Object> {
         Node::Program(x) => eval_statements(x),
         Node::Statement(x) => match x {
             ast::Statement::ExpressionStatement{ expr } => eval(Node::Expression(expr)),
+            ast::Statement::ReturnStatement{ value } => {
+                if let Some(x) = eval(Node::Expression(value)) {
+                    Some(Object::Return(Box::new(x)))
+                } else { None }
+            }
             _ => None
         },
         Node::Expression(x) => match x {
@@ -40,6 +45,9 @@ fn eval_statements(stmts: ast::Program) -> Option<Object> {
     let mut result = None;
     for stmt in &*stmts {
         result = eval(Node::Statement(stmt.clone()));
+        if let Some(Object::Return(x)) = result {
+            return Some(*x)
+        }
     }
     result
 }
@@ -242,5 +250,28 @@ mod tests {
 
     fn test_null_object(obj: Object) {
         assert_eq!(obj, Object::Null);
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            ("return 10;", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (r#"if (10 > 1) {
+                    if (10 > 1) {
+                        return 10;
+                    }
+                    return 1;
+                }
+            "#, 10)
+        ];
+
+        for tt in tests {
+            if let Some(evaluated) = test_eval(tt.0) {
+                test_integer_object(evaluated, tt.1);
+            } else { assert!(false) }
+        }
     }
 }

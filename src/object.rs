@@ -2,6 +2,7 @@
 pub enum Object {
     Integer(i64),
     Boolean(bool),
+    Return(Box<Object>),
     Null,
 }
 
@@ -10,6 +11,7 @@ impl std::fmt::Display for Object {
         match self {
             Object::Integer(x) => write!(f, "{}", x),
             Object::Boolean(x) => write!(f, "{}", x),
+            Object::Return(x) => write!(f, "{}", *x),
             Object::Null => write!(f, "null"),
         }
     }
@@ -20,6 +22,7 @@ impl Object {
         match self {
             Object::Integer(_) => "INTEGER",
             Object::Boolean(_) => "BOOLEAN",
+            Object::Return(_) => "RETURN",
             Object::Null => "NULL",
         }.to_string()
     }
