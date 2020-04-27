@@ -15,6 +15,7 @@ pub fn eval(node: Node) -> Option<Object> {
             ast::Statement::ExpressionStatement{ expr } => eval(Node::Expression(expr)),
             ast::Statement::ReturnStatement{ value } => {
                 if let Some(x) = eval(Node::Expression(value)) {
+                    if is_error(&x) { return Some(x) }
                     Some(Object::Return(Box::new(x)))
                 } else { None }
             }
@@ -24,16 +25,23 @@ pub fn eval(node: Node) -> Option<Object> {
             //println!("{:?}", x);
             match x {
             ast::Expression::IntegerLiteral(Token::Int(x)) => Some(Object::Integer(x)),
-            ast::Expression::Boolean(Token::True) => Some(Object::Boolean(true)),
-            ast::Expression::Boolean(Token::False) => Some(Object::Boolean(false)),
+            ast::Expression::Boolean(Token::True) => Some(native_bool_to_boolean_object(true)),
+            ast::Expression::Boolean(Token::False) => Some(native_bool_to_boolean_object(false)),
             ast::Expression::InfixExpression{ left, opr, right } => {
-                let left = eval(Node::Expression(*left)).unwrap();
-                let right = eval(Node::Expression(*right)).unwrap();
-                Some(eval_infix_expression(left, opr, right))
+                let left = if let Some(x) = eval(Node::Expression(*left)) {
+                    if is_error(&x) { return Some(x) } else { Some(x) }
+                } else { None };
+                
+                let right = if let Some(x) = eval(Node::Expression(*right)) {
+                    if is_error(&x) { return Some(x) } else { Some(x) }
+                } else { None };
+                eval_infix_expression(left, opr, right)
             }
             ast::Expression::PrefixExpression{ opr, right } => {
-                let right = eval(Node::Expression(*right));
-                Some(eval_prefix_expression(opr, right.unwrap()))
+                let right = if let Some(x) = eval(Node::Expression(*right)) {
+                    if is_error(&x) { return Some(x) } else { Some(x) }
+                } else { None };
+                eval_prefix_expression(opr, right)
             },
             ast::Expression::IfExpression{ condition, conseqence, alternative } => {
                 eval_if_expression(*condition, conseqence, alternative)
@@ -58,7 +66,9 @@ fn eval_statements(stmts: ast::Program) -> Option<Object> {
 }
 
 fn eval_if_expression(condition: ast::Expression, conseqence: ast::Program, alternative: Option<ast::Program>) -> Option<Object> {
-    let cd = eval(Node::Expression(condition));
+    let cd = if let Some(x) = eval(Node::Expression(condition)) {
+        if is_error(&x) { return Some(x) } else { Some(x) }
+    } else { None };
     match cd {
         Some(Object::Boolean(false)) | Some(Object::Null) => {
             if let Some(x) = alternative {
@@ -71,19 +81,31 @@ fn eval_if_expression(condition: ast::Expression, conseqence: ast::Program, alte
     }
 }
 
-fn eval_infix_expression(left: Object, opr: Token, right: Object) -> Object {
-    if left.get_type() == "INTEGER" && right.get_type() == "INTEGER" {
-        let x = if let Object::Integer(x) = left { x } else { 0 };
-        let y = if let Object::Integer(x) = right { x } else { 0 };
-        eval_integer_infix_expression(x, opr, y)
-    } else if left.get_type() != right.get_type() {
-        Object::Error(format!("type mismatch: {} {} {}", left.get_type(), opr, right.get_type()))
-    } else if opr == Token::Equal {
-        native_bool_to_boolean_object(left == right)
-    } else if opr == Token::NotEqual {
-        native_bool_to_boolean_object(left != right)
-    } else {
-        Object::Error(format!("unknown operator: {} {} {}", left.get_type(), opr, right.get_type()))
+fn is_infix_operator(opr: Token) -> bool {
+    match opr {
+        Token::Plus | Token::Minus | Token::Asterisk | Token::Slash | Token::Lt | Token::Gt | Token::Equal | Token::NotEqual => true,
+        _ => false
+    }
+}
+
+fn eval_infix_expression(left: Option<Object>, opr: Token, right: Option<Object>) -> Option<Object> {
+    match (left.clone(), opr.clone(), right.clone()) {
+        (Some(x), Token::Equal, Some(y)) => 
+            Some(native_bool_to_boolean_object(x == y)),
+        (Some(x), Token::NotEqual, Some(y)) => 
+            Some(native_bool_to_boolean_object(x != y)),
+        (Some(Object::Integer(x)), _, Some(Object::Integer(y))) => 
+            Some(if is_infix_operator(opr.clone()) {
+                eval_integer_infix_expression(x, opr, y)
+            } else {
+                Object::Error(format!("unknown operator: {} {} {}", left.unwrap().get_type(), opr, right.unwrap().get_type()))
+            }),
+        (Some(x), _, Some(y)) => Some(if x.get_type() != y.get_type() {
+                Object::Error(format!("type mismatch: {} {} {}", x.get_type(), opr, y.get_type()))
+            } else {
+                Object::Error(format!("unknown operator: {} {} {}", x.get_type(), opr, y.get_type()))
+            }),
+        _ => None
     }
 }
 
@@ -108,11 +130,12 @@ fn native_bool_to_boolean_object(b: bool) -> Object {
     }
 }
 
-fn eval_prefix_expression(opr: Token, right: Object) -> Object {
-    match opr {
-        Token::Minus => eval_minus_prefix_iperator_expression(right),
-        Token::Bang => eval_bang_operator_expression(right),
-        _ => Object::Error(format!("unknown operator: {} {}", opr, right.get_type()))
+fn eval_prefix_expression(opr: Token, right: Option<Object>) -> Option<Object> {
+    match (opr.clone(), right) {
+        (Token::Minus, Some(right)) => Some(eval_minus_prefix_iperator_expression(right)),
+        (Token::Bang, Some(right)) => Some(eval_bang_operator_expression(right)),
+        (_, Some(right)) => Some(Object::Error(format!("unknown operator: {} {}", opr, right.get_type()))),
+        _ => None
     }
 }
 
@@ -132,6 +155,9 @@ fn eval_bang_operator_expression(right: Object) -> Object {
     }
 }
 
+fn is_error(obj: &Object) -> bool {
+    obj.get_type() == "ERROR"
+}
 
 #[cfg(test)]
 mod tests {
