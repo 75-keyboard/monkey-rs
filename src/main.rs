@@ -13,7 +13,7 @@ fn main() {
     println!("Hello! This is the Monkey programming language!");
     println!(">> ");
     let mut buffer = String::new();
-    let mut env = evaluator::Environment::new();
+    let mut env = evaluator::Evaluator::new();
     while let Ok(_) = io::stdin().read_line(&mut buffer) {
         let l = Lexer::new(&buffer);
         let mut p = Parser::new(l);

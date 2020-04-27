@@ -1,6 +1,8 @@
 use crate::token::Token;
 use crate::object::Object;
 use crate::ast;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 pub enum Node {
     Program(ast::Program),
@@ -8,24 +10,46 @@ pub enum Node {
     Expression(ast::Expression),
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Environment {
-    store: std::collections::HashMap<String, Object>
+    store: std::collections::HashMap<String, Object>,
+    outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
     pub fn new() -> Environment {
-        Environment{ store: std::collections::HashMap::new() }
+        Environment{ store: std::collections::HashMap::new(), outer: None }
+    }
+
+    pub fn new_enclosed_enviroment(outer: Rc<RefCell<Environment>>) -> Environment {
+        Environment{ store: std::collections::HashMap::new(), outer: Some(outer) }
     }
 
     pub fn get(&mut self, name: String) -> Option<Object> {
         if let Some(x) = self.store.get(&name) {
             Some(x.clone())
-        } else { Some(Object::Error(format!("identifier not found: {}", name))) }
+        } else { 
+            if let Some(ref y) = &mut self.outer {
+                y.borrow_mut().get(name)
+            } else {
+                Some(Object::Error(format!("identifier not found: {}", name)))
+            }
+        }
     }
 
     pub fn set(&mut self, name: String, val: Object) -> Object {
         self.store.insert(name, val.clone());
         val
+    }
+}
+
+pub struct Evaluator {
+    environment: Rc<RefCell<Environment>>
+}
+
+impl Evaluator {
+    pub fn new() -> Evaluator {
+        Evaluator{ environment: Rc::new(RefCell::new(Environment::new())) }
     }
 
     pub fn eval(&mut self, node: Node) -> Option<Object> {
@@ -41,7 +65,7 @@ impl Environment {
                 },
                 ast::Statement::LetStatement{ name, value } => {
                     if let Some(x) = self.eval(Node::Expression(value)) {
-                        if is_error(&x) { Some(x) } else { Some(self.set(name.to_string(), x)) }
+                        if is_error(&x) { Some(x) } else { Some(self.environment.borrow_mut().set(name.to_string(), x)) }
                     } else { None }
                 },
                 _ => None
@@ -53,7 +77,7 @@ impl Environment {
                 ast::Expression::Boolean(Token::True) => Some(self.native_bool_to_boolean_object(true)),
                 ast::Expression::Boolean(Token::False) => Some(self.native_bool_to_boolean_object(false)),
                 ast::Expression::Identifier(Token::Ident(x)) => {
-                    self.get(x)
+                    self.environment.borrow_mut().get(x)
                 },
                 ast::Expression::InfixExpression{ left, opr, right } => {
                     let left = if let Some(x) = self.eval(Node::Expression(*left)) {
@@ -73,10 +97,63 @@ impl Environment {
                 },
                 ast::Expression::IfExpression{ condition, conseqence, alternative } => {
                     self.eval_if_expression(*condition, conseqence, alternative)
+                },
+                ast::Expression::FnLiteral{ parameters, body } => {
+                    Some(Object::Function(parameters, body, Rc::clone(&self.environment)))
+                },
+                ast::Expression::CallExpression{ function, arguments } => {
+                    let function = if let Some(x) = self.eval(Node::Expression(*function)) {
+                        if is_error(&x) { return Some(x) } else { x }
+                    } else { return None };
+                    
+                    let args = self.eval_expressions(arguments);
+                    if args.len() == 1 && is_error(&args[0]) {
+                        return Some(args[0].clone());
+                    }
+
+                    self.apply_function(function, args)
                 }
                 _ => None
             }}
         }
+    }
+
+    fn eval_expressions(&mut self, arguments: Vec<ast::Expression>) -> Vec<Object> {
+        let mut result = Vec::new();
+        for i in arguments {
+            if let Some(evaluated) = self.eval(Node::Expression(i)) {
+                if is_error(&evaluated) { return vec![evaluated]; }
+                result.push(evaluated);
+            }
+        }
+        result
+    }
+
+    fn apply_function(&mut self, function: Object, args: Vec<Object>) -> Option<Object> {
+        let (params, body, env): (Vec<ast::Expression>, ast::Program, Rc<RefCell<Environment>>) = match function.clone() {
+            Object::Function(parameters, body, environment) => (parameters, body, environment),
+            _ => return Some(Object::Error(format!("not a function: {}", function.get_type())))
+        };
+
+        let current_env = Rc::clone(&self.environment);
+        let mut scoped_env = Environment::new_enclosed_enviroment(Rc::clone(&env));
+        let list = params.iter().zip(args.iter());
+        for (_, (ident, o)) in list.enumerate() {
+            match ident {
+                ast::Expression::Identifier(Token::Ident(name)) => {
+                    scoped_env.set(name.clone(), o.clone());
+                },
+                _ => return None
+            }
+        }
+
+        self.environment = Rc::new(RefCell::new(scoped_env));
+
+        let object = self.eval(Node::Program(body));
+
+        self.environment = current_env;
+
+        object
     }
 
     fn eval_statements(&mut self, stmts: ast::Program) -> Option<Object> {
@@ -226,7 +303,7 @@ mod tests {
         let l = Lexer::new(input);
         let mut p = Parser::new(l);
         let program = p.parse_program();
-        let mut env = evaluator::Environment::new();
+        let mut env = evaluator::Evaluator::new();
 
         return env.eval(evaluator::Node::Program(program));
     }
@@ -390,6 +467,36 @@ mod tests {
         for tt in tests {
             if let Some(Object::Error(x)) = test_eval(tt.0) {
                 assert_eq!(&x, tt.1);
+            } else { panic!("{:?}", tt) }
+        }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let tests = "fn(x) { (x + 2) }";
+
+        let evaluated = test_eval(tests);
+        if let Some(Object::Function(params, ..)) = evaluated.clone() {
+            assert_eq!(params.len(), 1);
+            assert_eq!(format!("{}", params[0]), "x");
+            assert_eq!(format!("{}", evaluated.unwrap()), tests);
+        } else { panic!("object is not Function. got {:?}", evaluated); }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let tests = vec![
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
+
+        for tt in tests {
+            if let Some(obj) = test_eval(tt.0) {
+                test_integer_object(obj, tt.1);
             } else { panic!("{:?}", tt) }
         }
     }

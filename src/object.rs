@@ -1,3 +1,8 @@
+use crate::ast;
+use crate::evaluator::Environment;
+use std::rc::Rc;
+use std::cell::RefCell;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Object {
     Integer(i64),
@@ -5,6 +10,7 @@ pub enum Object {
     Return(Box<Object>),
     Null,
     Error(String),
+    Function(Vec<ast::Expression>, ast::Program, Rc<RefCell<Environment>>),
 }
 
 impl std::fmt::Display for Object {
@@ -15,6 +21,17 @@ impl std::fmt::Display for Object {
             Object::Return(x) => write!(f, "{}", *x),
             Object::Null => write!(f, "null"),
             Object::Error(x) => write!(f, "{}", x),
+            Object::Function(params, body, ..) => write!(f, "fn({}) {{ {} }}", 
+                    params.iter().enumerate().fold(
+                        String::new(), |s, (i, p)| {
+                            println!("{:?} {:?}", i, p);
+                            if i != params.len()-1 {
+                                format!("{}{}, ", s, p)
+                            } else {
+                                format!("{}{}", s, p)
+                            }}
+                        )
+                    , body)
         }
     }
 }
@@ -27,6 +44,7 @@ impl Object {
             Object::Return(_) => "RETURN",
             Object::Null => "NULL",
             Object::Error(_) => "ERROR",
+            Object::Function(..) => "FUNCTION",
         }.to_string()
     }
 }
